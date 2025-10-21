@@ -71,3 +71,13 @@ Run this command from the project root (`/kidos`) to correctly load the package 
 
 ```bash
 uvicorn Backend.main:app --reload --host 0.0.0.0 --port 8000
+
+### 2. Start the React app
+
+Run this command from the project root (`/kidos`) to correctly load the package structure and all models:
+
+```bash
+npm start
+
+
+##you can check the model on the frontend
