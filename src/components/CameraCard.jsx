@@ -1,173 +1,192 @@
-// --- START OF FILE CameraCard.jsx (With Toggle Button) ---
-
+// --- START OF FILE CameraCard.jsx (Futuristic Look & Video/File Input) ---
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { predictFile } from '../api';
 import { motion } from 'framer-motion';
-import { Video, VideoOff } from 'lucide-react'; // Import icons for the button
+import { Video, VideoOff, Upload, Play, Camera, StopCircle } from 'lucide-react';
 
-export default function CameraCard({ modelName, onPrediction, displayName = "Facial Engagement" }) {
+// Added latestPrediction and displayName props for dynamic UI
+export default function CameraCard({ modelName, onPrediction, latestPrediction, displayName }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+  
   const [pred, setPred] = useState(null); 
-  const [status, setStatus] = useState('Initializing...');
+  const [status, setStatus] = useState('Select Video or Start Camera');
   const [sending, setSending] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(false); // NEW: State to control camera
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [videoSource, setVideoSource] = useState('camera'); // 'camera' or 'file'
+  const [videoFile, setVideoFile] = useState(null);
 
-  // --- Core Camera/Stream Management Logic ---
-  const startCamera = useCallback(async () => {
-    if (isCameraOn) return; // Prevent double start
-    setStatus('Starting camera...');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setIsCameraOn(true);
-        setStatus('Camera ON');
-      }
-    } catch (e) {
-      console.error("Camera error:", e);
-      setStatus('Camera permission denied or device error');
-      setIsCameraOn(false);
-    }
-  }, [isCameraOn]);
-
-  const stopCamera = useCallback(() => {
+  // --- Utility Functions ---
+  const stopStream = useCallback(() => {
     if (videoRef.current?.srcObject) {
-      // Stop all tracks (video, audio) in the stream
       videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
       videoRef.current.srcObject = null;
     }
     setIsCameraOn(false);
-    setStatus('Camera OFF');
+    setStatus('Analysis Stopped');
+    if (videoRef.current) videoRef.current.pause();
   }, []);
+
+  const startCamera = useCallback(async () => {
+    stopStream(); 
+    setStatus('Starting Camera...');
+    setVideoSource('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+      setIsCameraOn(true);
+      setStatus('LIVE FEED | Analyzing');
+    } catch (e) {
+      console.error("Camera error:", e);
+      setStatus('Camera Permission Denied');
+      setIsCameraOn(false);
+    }
+  }, [stopStream]);
+
+  const startVideoFile = useCallback(async (file) => {
+    stopStream();
+    setVideoSource('file');
+    setVideoFile(file);
+    const videoURL = URL.createObjectURL(file);
+    videoRef.current.srcObject = null; // Clear camera stream
+    videoRef.current.src = videoURL;
+    videoRef.current.loop = true; // Loop the video for continuous analysis
+    await videoRef.current.play();
+    setIsCameraOn(true);
+    setStatus(`FILE LOADED | Analyzing ${file.name}`);
+  }, [stopStream]);
 
   // --- Initial Mount / Unmount Cleanup ---
   useEffect(() => {
-    // Start camera immediately on mount (you can change this to start on button press)
-    // For now, let's keep it OFF by default and require a button press.
-    // startCamera(); // <-- Commented out to start OFF
-    setStatus('Camera is OFF. Click to start.');
-    
-    // Cleanup function runs on unmount
-    return () => {
-      stopCamera();
-    };
-  }, []); // Run only once on mount
+    return () => { stopStream(); };
+  }, [stopStream]);
 
   // --- Prediction Polling Logic ---
   useEffect(() => {
     let id;
     if (isCameraOn) {
-      // Start polling only if the camera is ON
       id = setInterval(captureAndSend, 1000); 
     }
-    // Cleanup function stops the interval when isCameraOn is false or component unmounts
     return () => {
       if (id) clearInterval(id);
     };
-  }, [isCameraOn, modelName, onPrediction]); // Re-run effect when camera state changes
-
-  // --- Toggle Handler ---
-  const handleToggle = () => {
-    if (isCameraOn) {
-      stopCamera();
-    } else {
-      startCamera();
-    }
-  };
+  }, [isCameraOn, modelName, onPrediction]); 
 
   // --- Capture and Send Function ---
   async function captureAndSend() {
     const v = videoRef.current;
     const c = canvasRef.current;
-    if (!v || !c || sending || !isCameraOn) return; // Added !isCameraOn check
+    if (!v || !c || sending || !isCameraOn || v.paused) return;
     
-    // ... (Canvas drawing logic remains the same)
-    c.width = 224;
-    c.height = 224;
-    const aspect = v.videoWidth / v.videoHeight;
-    const drawWidth = c.height * aspect;
-    const drawX = (c.width - drawWidth) / 2;
-    c.getContext('2d').drawImage(v, 0, 0, v.videoWidth, v.videoHeight, drawX, 0, drawWidth, c.height);
+    // Canvas drawing logic (224x224 crop)
+    c.width = 224; c.height = 224;
+    const [vw, vh] = [v.videoWidth, v.videoHeight];
+    const aspect = vw / vh;
+    const [dw, dh] = aspect > 1 ? [c.height * aspect, c.height] : [c.width, c.width / aspect];
+    const [dx, dy] = [c.width / 2 - dw / 2, c.height / 2 - dh / 2];
+
+    c.getContext('2d').drawImage(v, dx, dy, dw, dh);
 
     setSending(true);
-    const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.7));
+    const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.8));
     
     try {
       const r = await predictFile(modelName, blob); 
       setPred(r);
-      if (onPrediction) {
-          onPrediction(r);
-      }
+      if (onPrediction) onPrediction(r);
     } catch (e) {
-      console.error("API Error in captureAndSend:", e);
-      setStatus('Prediction failed'); 
+      // Keep running but show error
+      console.error("API Error in captureAndSend:", e.response?.data?.detail || e.message);
     } finally {
       setSending(false);
     }
   }
-
-  // --- Rendering Logic ---
-  const pEng = pred ? pred.confidence : null; 
+  
+  // --- RENDERING LOGIC ---
+  const pEng = latestPrediction?.confidence || pred?.confidence || null; 
   const pEngPercent = pEng ? (pEng * 100).toFixed(0) : '—';
-  const label = pred?.label || '...';
+  const label = latestPrediction?.label || pred?.label || 'UNKNOWN';
   
   const barColor = label === 'engaged' 
-    ? 'from-green-400 to-emerald-500' 
-    : 'from-orange-400 to-red-500';
+    ? 'bg-emerald-500' 
+    : label === 'not_engaged' ? 'bg-orange-500' : 'bg-gray-500';
+
+  const cameraButtonText = isCameraOn ? 'Stop Analysis' : videoSource === 'file' ? 'Start File' : 'Start Camera';
+  const CameraIcon = isCameraOn ? StopCircle : (videoSource === 'file' ? Play : Camera);
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="card"
+      className="card flex flex-col h-full"
     >
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-lg font-semibold">{displayName}</h3>
-        <button 
-          onClick={handleToggle}
-          className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 transition-colors ${
-            isCameraOn 
-              ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
-          }`}
-        >
-          {isCameraOn ? <VideoOff size={16} /> : <Video size={16} />}
-          {isCameraOn ? 'Camera OFF' : 'Camera ON'}
-        </button>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-bold text-white">{displayName}</h3>
+        <p className={`text-sm font-medium ${isCameraOn ? 'text-emerald-400' : 'text-gray-400'}`}>{status}</p>
       </div>
-      
-      {/* Status Bar */}
-      <p className="text-sm text-gray-600 mb-3">{sending ? 'Sending...' : status}</p>
 
-      {/* Video Feed */}
-      {/* Conditional rendering: show video if on, or a placeholder if off */}
-      <div className={`w-full rounded-lg ${isCameraOn ? 'bg-black' : 'bg-gray-800'}`}>
+      {/* Video Feed and Controls */}
+      <div className="relative w-full aspect-video rounded-lg bg-gray-900/90 overflow-hidden shadow-xl mb-4">
+        {/* Actual Video Element */}
         <video 
           ref={videoRef} 
-          className={`w-full rounded-lg ${isCameraOn ? 'opacity-100' : 'opacity-0 h-0'}`} 
-          style={{ minHeight: isCameraOn ? '300px' : '0px' }}
-          muted 
+          className="w-full h-full object-cover rounded-lg"
+          style={{ display: isCameraOn ? 'block' : 'none' }}
+          muted playsInline
         />
         {/* Placeholder when camera is off */}
         {!isCameraOn && (
-            <div className="h-48 flex items-center justify-center text-white">
-                <VideoOff size={32} className="mr-2" /> Camera is Off
+            <div className="h-full flex items-center justify-center flex-col text-indigo-400 space-y-4">
+                <VideoOff size={48} />
+                <p className="text-lg">{status}</p>
             </div>
         )}
       </div>
+      
+      {/* BUTTON BAR */}
+      <div className='flex gap-4 justify-center pb-4 border-b border-indigo-700/50'>
+        {/* Main ON/OFF Toggle */}
+        <button 
+          onClick={isCameraOn ? stopStream : startCamera}
+          className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-colors shadow-lg ${
+            isCameraOn 
+              ? 'bg-red-600 text-white hover:bg-red-700' 
+              : 'bg-emerald-500 text-white hover:bg-emerald-600'
+          }`}
+        >
+          <CameraIcon size={18} />
+          {isCameraOn ? 'STOP ANALYSIS' : 'START CAMERA'}
+        </button>
 
-      <div className="mt-3">
-        <div className="text-sm text-gray-500">{`Engagement Probability (${label.toUpperCase()})`}</div>
-        <div className="mt-2 bg-gray-200 h-3 rounded overflow-hidden">
-          <div
-            style={{ width: `${pEng ? pEng * 100 : 0}%` }}
-            className={`h-full bg-gradient-to-r ${barColor} transition-all duration-500`} 
-          ></div>
+        {/* File Input */}
+        <input type="file" ref={fileInputRef} onChange={(e) => startVideoFile(e.target.files[0])} accept="video/*" style={{ display: 'none' }} />
+        <button
+          onClick={() => fileInputRef.current.click()}
+          className="px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-lg"
+          title="Upload video file for analysis"
+        >
+          <Upload size={18} /> Load Video File
+        </button>
+      </div>
+
+
+      {/* Engagement Probability Bar */}
+      <div className="mt-6">
+        <div className="text-sm font-medium text-indigo-300 mb-2">
+          {`Engagement Level: ${label.toUpperCase()}`}
         </div>
-        <div className="text-right text-sm mt-1 font-medium">
-          {`${pEngPercent}${pEng !== null ? '%' : ''}`}
+        <div className="bg-gray-700 h-4 rounded-full overflow-hidden shadow-inner">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pEng ? pEng * 100 : 0}%` }}
+            transition={{ duration: 0.5 }}
+            className={`h-full ${barColor} transition-all duration-500`} 
+          ></motion.div>
+        </div>
+        <div className="text-right text-sm mt-2 font-bold text-white">
+          {`${pEngPercent}${pEng !== null ? '%' : ''} Confidence`}
         </div>
       </div>
       <canvas ref={canvasRef} style={{ display: 'none' }} />

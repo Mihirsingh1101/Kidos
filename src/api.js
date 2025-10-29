@@ -39,4 +39,20 @@ export async function getHealthStatus() {
     const res = await axios.get(`${API}/health`);
     return res.data;
 }
+
+/**
+ * Sends a lecture transcript file to the backend to map student doubts to time segments.
+ * @param {File} transcriptFile - The file containing the timestamped lecture transcript.
+ * @returns {Promise<object>} The flagged time segments.
+ */
+export async function analyzeLecture(transcriptFile) {
+  const form = new FormData();
+  // Key 'lecture_transcript_file' must match the parameter in lecture_analysis_router.py
+  form.append("lecture_transcript_file", transcriptFile, "lecture.txt"); 
+  
+  const res = await axios.post(`${API}/teacher/analyze_lecture`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
 // --- END OF FILE api.js (Updated) ---

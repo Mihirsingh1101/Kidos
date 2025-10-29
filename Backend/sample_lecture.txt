@@ -1,0 +1,6 @@
+[00:00:05] Good morning, everyone. Today we're starting our module on React Hooks.
+[00:01:20] The first hook we'll cover is useState. It allows functional components to manage state.
+[00:02:40] Remember, calling useState gives you a pair: the current state value and an update function.
+[00:04:10] The second main hook is useEffect. This is used for side effects, like fetching data.
+[00:05:30] useEffect runs after every render, but you can control it using the dependency array.
+[00:06:50] If you use an empty array, it runs only once, mimicking componentDidMount.

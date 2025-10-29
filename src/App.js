@@ -1,11 +1,12 @@
-// --- START OF FILE App.js (Final Hub) ---
+// --- START OF FILE App.js (FINAL CORRECTED HUB) ---
 
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import CameraCard from './components/CameraCard';
 import EngagementChart from './components/EngagementChart';
-import SpeechAnalysis from './components/SpeechAnalysis'; // NEW IMPORT
-import TopicCard from './components/TopicCard'; // NEW IMPORT
+import SpeechAnalysis from './components/SpeechAnalysis';
+// CHANGE: Import the new LectureAnalysisCard (renamed from TopicCard/old analysis)
+import LectureAnalysisCard from './components/LectureAnalysisCard'; 
 import './index.css';
 
 // --- CONFIGURATION ---
@@ -28,7 +29,7 @@ export default function App() {
 
   const handleNewPrediction = (modelName, prediction) => {
     if (!MODEL_CONFIG[modelName]) return; 
-    // ... (rest of the handleNewPrediction logic remains the same)
+    
     setModelTrendData(prevData => {
         const newEntry = {
             confidence: prediction.confidence,
@@ -73,9 +74,9 @@ export default function App() {
             <SpeechAnalysis 
                 onTranscript={setLatestTranscript} // Updates the latest transcript state
             />
-            {/* Component for analyzing all collected transcripts */}
-            <TopicCard 
-                latestTranscript={latestTranscript} // Shows the last recorded doubt
+            {/* Component for the Teacher's Lecture Analysis */}
+            <LectureAnalysisCard 
+                latestTranscript={latestTranscript} // Pass the latest doubt for display
             />
           </div>
         </div>
@@ -83,4 +84,4 @@ export default function App() {
     </div>
   );
 }
-// --- END OF FILE App.js (Final Hub) ---
+// --- END OF FILE App.js (FINAL CORRECTED HUB) ---

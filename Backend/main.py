@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from .fer_router import router as fer_router, load_fer_models
 from .asr_router import router as asr_router, load_asr_model
 from .topic_analysis import router as topic_router, load_sentence_model 
+from .lecture_analysis_router import router as lecture_router 
 
 # ---------------- Lifespan Event Handler ---------------- #
 @asynccontextmanager
@@ -35,6 +36,7 @@ app = FastAPI(title="Multimodal Classroom Monitor", lifespan=lifespan)
 app.include_router(fer_router)       # Routes: /predict/{model_name}
 app.include_router(asr_router)      # Routes: /asr/transcribe
 app.include_router(topic_router)    # Routes: /analyze/topics
+app.include_router(lecture_router)
 
 # CORS configuration
 origins = [ "http://localhost:3000", "http://127.0.0.1:3000" ]
