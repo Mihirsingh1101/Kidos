@@ -92,7 +92,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
         # Use the pipeline to transcribe and translate
         result = asr_pipeline(
             temp_filename, 
-            generate_kwargs={"task": "translate", "language": "english"}
+            generate_kwargs={"task": "translate"}
         )
         
         transcript = result.get("text", "").strip()
