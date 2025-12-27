@@ -81,4 +81,4 @@ Run this command from the project root (`/kidos`) to correctly load the package 
 npm start
 ```
 
-##you can check the model on the frontend
+## you can check the model on the frontend
